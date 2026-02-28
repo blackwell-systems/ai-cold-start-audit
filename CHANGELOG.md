@@ -13,6 +13,7 @@
 - `init` subcommand for scaffolding `.claude/settings.json` permissions
 - Multi-package-manager support in filler agent (apt, apk, Homebrew, none)
 - **Timestamp metadata in audit reports** (2026-02-28): Audit report template now includes metadata header with Audit Date, Tool Version, Container name, and Environment. Makes staleness visible and enables regression tracking across audits. Helps prioritize findings based on when they were discovered. ([commit 67958a5](https://github.com/anthropics/agentic-cold-start-audit/commit/67958a5))
+- **Container lifecycle documentation** (2026-02-28): Container Setup section now clarifies the three-tier distinction between Dockerfile (stable infrastructure template), image (rebuilt per round from source changes), and container (ephemeral running instance). Separates first-time setup from subsequent rounds. Prevents unnecessary Dockerfile recreation when only source code changed. Recommends round-specific naming (mytool-r1, mytool-r2) for clarity. ([commit b7a5a41](https://github.com/anthropics/agentic-cold-start-audit/commit/b7a5a41))
 
 ### Changed
 - Skill is now fully self-contained - works from any project directory without cloning the repo
