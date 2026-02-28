@@ -1,12 +1,12 @@
-# ai-ux-audit
+# ai-cold-start-audit
 
-AI-driven UX auditing for CLI tools using containerized sandboxes.
+Cold-start UX auditing for CLI tools. AI agents simulate new users in containerized sandboxes, surfacing friction you can't see yourself.
 
 A filler agent reads your project's help output and subcommands to populate a structured prompt template. An audit agent executes every subcommand as a simulated new user inside a Docker container, producing a severity-tiered findings report with reproduction steps.
 
 ## Why
 
-You can't UX-test your own tool — you know too much. AI agents have no prior context, making them ideal surrogate new users. Run them in a disposable container with full access and they'll find the friction you can't see.
+You can't UX-test your own tool — you know too much. AI agents have zero prior context, making them ideal cold-start testers. Run them in a disposable container with full access and they'll find the friction you can't see.
 
 ## How
 
