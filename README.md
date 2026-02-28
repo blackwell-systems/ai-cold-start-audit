@@ -2,7 +2,7 @@
 
 AI-driven UX auditing for CLI tools using containerized sandboxes.
 
-A setup agent reads your project's help output and README, then populates a structured prompt template. An audit agent executes every subcommand as a simulated new user inside a Docker container, producing a severity-tiered findings report with reproduction steps.
+A filler agent reads your project's help output and subcommands to populate a structured prompt template. An audit agent executes every subcommand as a simulated new user inside a Docker container, producing a severity-tiered findings report with reproduction steps.
 
 ## Why
 
@@ -10,36 +10,29 @@ You can't UX-test your own tool — you know too much. AI agents have no prior c
 
 ## How
 
-1. Start a sandbox container with your tool installed and bind-mounted
-2. A **setup agent** inspects `--help`, the README, and available subcommands to fill the audit template
-3. An **audit agent** executes the filled template inside the container as a new user
+1. Build and start a sandbox container with your tool installed
+2. A **filler agent** runs `--help` on every subcommand, inspects the environment, and fills the prompt template
+3. An **audit agent** executes the filled prompt inside the container as a new user
 4. Findings are written as a structured report grouped by area with severity tiers
 
-## Prompts
+See [`workflow.md`](workflow.md) for the full repeatable process including prerequisites, permissions setup, and launch instructions.
 
-- [`prompts/audit-template.md`](prompts/audit-template.md) — Prompt template for the audit agent. Variables are filled by the setup agent.
-- [`prompts/setup-agent.md`](prompts/setup-agent.md) — Prompt for the setup agent that inspects the project and fills the template.
+## Files
+
+| File | Purpose |
+|------|---------|
+| [`workflow.md`](workflow.md) | Repeatable process — prerequisites, permissions, launch steps, triage |
+| [`sandbox-setup.md`](sandbox-setup.md) | Container design, Dockerfile patterns, docker exec vs bind mount |
+| [`prompts/prompt-template.md`](prompts/prompt-template.md) | Audit prompt template with variable table and audit areas structure |
+| [`prompts/filler-agent-prompt.md`](prompts/filler-agent-prompt.md) | Agent that discovers tool metadata and fills the template |
 
 ## Severity Tiers
 
-| Tier | Meaning |
-|------|---------|
-| **UX-critical** | Blocks or confuses a new user — they'd give up |
-| **UX-improvement** | Friction that slows users down but doesn't block them |
-| **UX-polish** | Minor rough edges — cosmetic or nice-to-have |
-
-## Container Setup
-
-Scope Claude Code permissions at the project level so agents can exec into the sandbox:
-
-```json
-// .claude/settings.json
-{
-  "permissions": {
-    "allow": ["Bash(docker exec my-sandbox*)"]
-  }
-}
-```
+| Tier | Meaning | Action |
+|------|---------|--------|
+| **UX-critical** | Broken, misleading, or blocks the user | Fix before next release |
+| **UX-improvement** | Confusing but functional | Prioritize for next sprint |
+| **UX-polish** | Minor friction or inconsistency | Batch into a cleanup PR |
 
 ## License
 
