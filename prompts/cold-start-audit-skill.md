@@ -10,7 +10,6 @@ Cold-Start UX Audit: AI agents simulate new users in sandboxed environments.
 - `report`: Read and summarize the findings from `docs/cold-start-audit.md`, grouped by severity.
 - `init <container-name>`: Scaffold `.claude/settings.json` with scoped permissions for the container (container mode only).
 
-**Backwards compatibility:** `setup <container-name> <tool-name>` and `run <container-name> <tool-name>` (two positional args, no `--mode` flag) are treated as container mode with the first arg as the container name.
 
 ## Sandbox Modes
 
