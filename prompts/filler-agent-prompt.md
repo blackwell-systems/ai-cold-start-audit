@@ -26,11 +26,17 @@ Run the following commands via `docker exec {{CONTAINER_NAME}}`:
 
 ### Step 2 — Discover the environment
 
-Run:
-1. `brew list --formula` — list installed formula packages
-2. `brew list --cask 2>/dev/null || echo "no casks"` — list installed casks
-3. `ls /home/linuxbrew/.linuxbrew/bin/ | head -30` or equivalent — confirm binaries available
-4. `echo $PATH` — confirm PATH setup
+Run commands to understand what's installed. Adapt to the container's package manager:
+
+- **Homebrew:** `brew list --formula`, `brew list --cask 2>/dev/null || echo "no casks"`
+- **apt (Debian/Ubuntu):** `dpkg --get-selections | grep -v deinstall | head -30`
+- **apk (Alpine):** `apk list --installed | head -30`
+- **No package manager:** `ls /usr/local/bin/ | head -30`
+
+Also run:
+1. `which {{TOOL_NAME}}` — confirm the tool is on PATH
+2. `ls /usr/local/bin/ | head -30` or equivalent — confirm binaries available
+3. `echo $PATH` — confirm PATH setup
 
 ### Step 3 — Fill in the template
 

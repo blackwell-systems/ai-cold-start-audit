@@ -50,6 +50,21 @@ Remove or stub out any missing hooks in `~/.claude/settings.json`.
 
 ---
 
+## Quick Path: Use the Skill
+
+If you have the `/cold-start-audit` skill installed (see README), the entire workflow is:
+
+```bash
+# Start your sandbox container, then:
+/cold-start-audit run <container-name> <tool-name>
+```
+
+The skill runs the filler agent and audit agent automatically and writes the report to `docs/cold-start-audit.md`.
+
+The steps below describe the manual workflow for when you want more control or aren't using Claude Code.
+
+---
+
 ## The Workflow
 
 ### Step 1 — Build and start the sandbox
@@ -70,30 +85,30 @@ docker ps --filter name=<container-name>
 
 ### Step 2 — Generate the audit prompt
 
-Use the filler agent in `filler-agent-prompt.md` to auto-discover tool metadata and produce
-a fully filled prompt. Provide it two inputs:
+Open `prompts/filler-agent-prompt.md`, substitute the three variables (`{{CONTAINER_NAME}}`, `{{TOOL_NAME}}`, `{{OUTPUT_PATH}}`), and paste the prompt into Claude Code (or any AI agent with bash access).
 
-- `CONTAINER_NAME` — the running container name
-- `TOOL_NAME` — the CLI binary to audit
-- `OUTPUT_PATH` — where to write the final report
+The filler agent will:
+1. Run `--help` on every subcommand to discover flags and usage
+2. Inspect the container environment (installed packages, PATH)
+3. Construct audit areas with exact commands to run
+4. Output a fully filled audit prompt — no placeholders remaining
 
-Or fill `prompt-template.md` manually if you prefer.
+Alternatively, fill `prompt-template.md` manually if you prefer to control the audit areas yourself.
 
-### Step 3 — Launch the background audit agent
+### Step 3 — Launch the audit agent
 
-Pass the filled prompt to a background Task agent:
+Start a **new Claude Code session** (or a background agent) and paste the filled prompt from Step 2. A fresh session is important — the agent must have zero context about your tool, simulating a new user.
+
+In Claude Code, you can launch a background agent:
 
 ```
-Task tool:
-  subagent_type: general-purpose
-  run_in_background: true
-  prompt: <filled audit prompt>
+"Run this audit in the background as a Task agent" + paste the filled prompt
 ```
 
 The agent will:
-1. Run 30+ commands against the container
-2. Observe output, errors, and behavior at each step
-3. Compile findings in structured format
+1. Run 30+ commands against the container via `docker exec`
+2. Observe output, errors, exit codes, and behavior at each step
+3. Compile findings in the structured severity-tiered format
 4. Write the final report to the specified output path
 
 ### Step 4 — Review findings
