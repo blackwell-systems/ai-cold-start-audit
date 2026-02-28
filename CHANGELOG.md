@@ -17,3 +17,18 @@
 ### Changed
 - Skill is now fully self-contained - works from any project directory without cloning the repo
 - Filler agent generalized from Homebrew-specific to language/platform-agnostic
+
+### Pattern Evolution Timeline
+
+The timestamp metadata improvement emerged from real-world usage:
+
+**brewprune Round 4 (2026-02-28):**
+- Scout phase produced IMPL doc with 31 P1/P2 findings
+- P0 manual fixes committed between scout and wave execution
+- Wave 1 launched days later - 7 of 17 findings already implemented (41%)
+- **Gap identified:** Can't tell how stale audit findings are
+- **Solution:** Add metadata header with audit date, tool version, container, environment
+
+**Result:** Makes staleness visible and enables regression tracking across audit rounds
+
+See [scout-and-wave/docs/LESSONS-ROUND4.md](https://github.com/anthropics/scout-and-wave/blob/main/docs/LESSONS-ROUND4.md) for complete case study.
