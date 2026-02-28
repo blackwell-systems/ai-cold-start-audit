@@ -12,6 +12,7 @@
 - Example output from real brewprune audit (21 findings)
 - `init` subcommand for scaffolding `.claude/settings.json` permissions
 - Multi-package-manager support in filler agent (apt, apk, Homebrew, none)
+- **Timestamp metadata in audit reports** (2026-02-28): Audit report template now includes metadata header with Audit Date, Tool Version, Container name, and Environment. Makes staleness visible and enables regression tracking across audits. Helps prioritize findings based on when they were discovered. ([commit 67958a5](https://github.com/anthropics/agentic-cold-start-audit/commit/67958a5))
 
 ### Changed
 - Skill is now fully self-contained - works from any project directory without cloning the repo
