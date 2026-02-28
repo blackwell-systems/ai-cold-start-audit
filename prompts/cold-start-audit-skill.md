@@ -135,6 +135,16 @@ Build a numbered list of areas with exact commands (not placeholders):
 Produce a self-contained audit prompt with all variables substituted. Write to `docs/cold-start-audit-prompt.md`. The filled prompt should follow this structure:
 
 ```
+# Cold-Start UX Audit Report
+
+**Metadata:**
+- Audit Date: <YYYY-MM-DD>
+- Tool Version: <tool-name> <version from --version>
+- Container: <container-name>
+- Environment: <OS/distribution from container>
+
+---
+
 You are performing a UX audit of <tool-name> - a tool that <description from help>.
 You are acting as a **new user** encountering this tool for the first time.
 
