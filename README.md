@@ -1,5 +1,7 @@
 # agentic-cold-start-audit
 
+[![Blackwell Systems™](https://raw.githubusercontent.com/blackwell-systems/blackwell-docs-theme/main/badge-trademark.svg)](https://github.com/blackwell-systems)
+
 Turn AI's lack of context into a feature. Agents cold-start your CLI in a sandboxed environment and report every friction point a new user would hit. Includes a Claude Code `/cold-start-audit` skill.
 
 A filler agent reads your project's help output and subcommands to populate a structured prompt template. An audit agent executes every subcommand as a simulated new user, producing a severity-tiered findings report with reproduction steps.
