@@ -1,24 +1,53 @@
 # agentic-cold-start-audit
 
 [![Blackwell Systems™](https://raw.githubusercontent.com/blackwell-systems/blackwell-docs-theme/main/badge-trademark.svg)](https://github.com/blackwell-systems)
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
 
-Turn AI's lack of context into a feature. Agents cold-start your CLI in a sandboxed environment and report every friction point a new user would hit. Includes a Claude Code `/cold-start-audit` skill.
-
-A filler agent reads your project's help output and subcommands to populate a structured prompt template. An audit agent executes every subcommand as a simulated new user, producing a severity-tiered findings report with reproduction steps.
+A two-agent protocol for discovering cold-start UX friction in CLI tools. A filler agent reads your project's help output and populates a structured audit prompt. An audit agent executes every subcommand as a simulated new user in a sandboxed environment, producing a severity-tiered findings report with exact reproduction steps. Human review is preserved: the skill waits for your confirmation before launching agents. Includes a Claude Code `/cold-start-audit` skill.
 
 ## Why
 
-You can't UX-test your own tool — you know too much. AI agents have zero prior context, making them ideal cold-start testers. Run them in an isolated sandbox and they'll find the friction you can't see.
+You can't UX-test your own tool — you know too much. Every mental model you've built, every shortcut you've learned, every implicit assumption about how the tool is used shapes your testing. You'll test the paths that work. You won't test the ones you never tried.
 
-## Quickstart
+AI agents have zero prior context. They follow the help text, try the obvious commands, and report exactly what breaks — because they have no workarounds to fall back on. That naive perspective is the one you need.
 
-Not sure which sandbox mode fits your tool? Let the skill decide:
+The problem is safety. An agent testing your production system can delete data, corrupt state, or trigger side effects. Every audit here runs inside an isolated sandbox — container, redirected env vars, or a fresh directory copy. The audit agent can fail safely, and you see every failure.
+
+The result is a severity-tiered findings report: what's broken, what's confusing, what's rough polish. Some findings are blockers. Others are sprint items. The [`/cold-start-audit report`](#commands) command triages them.
+
+## When to Use It
+
+Cold-start auditing is most useful when:
+
+1. **Your tool ships to users who don't know you** — Every new user is a cold start. If your tool is public or widely used, discovering friction before release saves support load.
+2. **You iterate on UX and want regression protection** — After fixing a round of findings, re-run the audit. New findings surface regressions; resolved findings confirm the fix landed.
+3. **Your tool has subcommands, flags, or modes** — The more surface area, the more opportunities for friction. A single-command tool with 2 flags may not benefit; a CLI with 10 subcommands will.
+4. **Your help text is the primary documentation** — If users rely on `--help` chains and examples, cold-start auditing validates that the help text actually teaches the tool.
+
+It is less useful for:
+
+- **Internal tools with a small team that knows the author** — Training cost exceeds discovery value.
+- **Tools requiring non-reproducible external setup** — APIs, live databases, or third-party accounts that can't be mocked in a sandbox reduce coverage.
+
+## Discovering the Right Sandbox Mode
+
+Not sure which isolation mode fits your tool? Ask the skill before anything else:
 
 ```bash
 /cold-start-audit mode mytool
-# → Mode recommendation: local | container | worktree
-# → Suggested command: /cold-start-audit run mytool --mode local --env MYTOOL_DB=/tmp/audit-xx/db
 ```
+
+The skill reads your tool's `--help` output and answers three diagnostic questions:
+
+1. **Does the tool have destructive operations?** (remove, delete, system writes)
+2. **Does the tool write only to self-managed state?** (its own DB, config file, redirectable via env var)
+3. **Does the tool operate on the current directory or file tree?**
+
+It emits a mode recommendation with rationale and a ready-to-run command. You don't need to understand the isolation mechanisms to get started — the skill handles the decision.
+
+## Quickstart
+
+After running `mode` to get your command, the full audit is one line:
 
 **Container mode** (destructive ops, package managers, system writes):
 
@@ -42,45 +71,73 @@ docker run -d --name my-sandbox --rm my-tool-sandbox sleep 3600
 
 The report lands in `docs/cold-start-audit.md`.
 
-See [`sandbox-setup.md`](sandbox-setup.md) for setup details, Dockerfile patterns, and mode guidance.
+See [`sandbox-setup.md`](sandbox-setup.md) for Dockerfile patterns, Docker setup, and mode guidance.
+
+## Commands
+
+```
+/cold-start-audit mode <tool-name>
+  Recommend a sandbox isolation mode. Reads --help output and answers
+  three diagnostic questions. Does not write any files.
+
+/cold-start-audit setup <tool-name> --mode <mode> [mode-args]
+  Run the filler agent only: discover tool metadata and write the filled
+  audit prompt to docs/cold-start-audit-prompt.md. Use when you want to
+  review the prompt before running the full audit.
+
+/cold-start-audit run <tool-name> --mode <mode> [mode-args]
+  Run the full audit (filler + audit agent). Checks for an existing prompt
+  and offers to reuse or regenerate. Writes findings to docs/cold-start-audit.md.
+
+/cold-start-audit report
+  Read and summarize the findings from docs/cold-start-audit.md, grouped by severity.
+
+/cold-start-audit init <container-name>
+  Scaffold .claude/settings.json with scoped Bash permissions for a named container.
+```
 
 ## How It Works
 
-1. **Choose a sandbox** — container, local env var, or worktree isolation depending on the tool's blast radius. Run `/cold-start-audit mode <tool-name>` if unsure.
-2. **Filler agent** — runs `--help` on every subcommand, inspects the sandbox environment, and populates the prompt template with real commands and the correct exec prefix
-3. **Audit agent** — executes the filled prompt inside the sandbox as a new user, noting every output, error, and friction point
-4. **Structured report** — findings grouped by area with severity tiers and exact reproduction steps
+1. **Choose a sandbox** — container, local env var, or worktree isolation, depending on the tool's blast radius. Run `/cold-start-audit mode <tool-name>` if unsure.
+2. **Filler agent** — runs `--help` on every subcommand, inspects the sandbox environment, and populates the prompt template with real commands and the correct exec prefix.
+3. **Audit agent** — executes the filled prompt inside the sandbox as a new user, noting every output, error, and friction point.
+4. **Structured report** — findings grouped by area with severity tiers and exact reproduction steps.
 
-## Usage with Claude Code
+For subsequent audits, the skill checks for an existing prompt and offers to reuse it (fast — only updates container name and date) or regenerate from scratch (when tool structure changed). This makes iterative auditing fast.
 
-Clone this repo and the project-level skill at `.claude/commands/cold-start-audit.md` works automatically. Or copy [`prompts/cold-start-audit-skill.md`](prompts/cold-start-audit-skill.md) to `~/.claude/commands/cold-start-audit.md` for a global slash command.
+## Permissions
 
-```bash
-# Recommend isolation mode for your tool (no sandbox needed yet)
-/cold-start-audit mode mytool
+Background agents cannot prompt for tool approval. Without an explicit `allow` rule, every `Bash` call is denied and the agent silently fails.
 
-# Setup only: discover tool metadata and generate the filled audit prompt
-/cold-start-audit setup mytool --mode container my-sandbox
-/cold-start-audit setup mytool --mode local --env MYTOOL_DB=/tmp/audit-$$/db.sqlite3
-/cold-start-audit setup mytool --mode worktree --dir /path/to/project
+### User-level (one-time setup)
 
-# Full audit: filler + audit agent (writes report to docs/cold-start-audit.md)
-/cold-start-audit run mytool --mode container my-sandbox
-/cold-start-audit run mytool --mode local --env MYTOOL_DB=/tmp/audit-$$/db.sqlite3
+Add to `~/.claude/settings.json`:
 
-# Summarize: read and triage the findings
-/cold-start-audit report
+```json
+{
+  "permissions": {
+    "allow": ["Bash", "Read", "Write"]
+  }
+}
 ```
 
-### Without the skill
+> **Common mistake:** `allow_bash: true` is not a valid Claude Code permission format and is silently ignored.
 
-You can run the audit manually without the Claude Code skill:
+After editing, restart your Claude Code session. Settings are not hot-reloaded.
 
-1. Substitute `{{CONTAINER_NAME}}`, `{{TOOL_NAME}}`, and `{{OUTPUT_PATH}}` in [`prompts/filler-agent-prompt.md`](prompts/filler-agent-prompt.md) and give it to Claude Code (or any AI agent with bash access)
-2. The filler agent produces a filled audit prompt
-3. Give the filled prompt to a fresh agent session - the agent runs all commands and writes the report
+### Project-level (optional, scoped)
 
-See [`workflow.md`](workflow.md) for the full process including permissions setup, prerequisites, and a pre-launch checklist.
+For tighter control, add `.claude/settings.json` to the project repo:
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(docker exec <container-name>*)"]
+  }
+}
+```
+
+> **Note:** Project-level permissions require user approval before they are trusted. Use user-level permissions for background agents that need to work without interaction.
 
 ## Example Output
 
@@ -106,27 +163,35 @@ Sample finding:
 - Repro: brewprune doctor → brewprune doctor --fix
 ```
 
+## Severity Tiers
+
+| Tier | Meaning | Examples | Action |
+|------|---------|----------|--------|
+| **UX-critical** | Broken, misleading, or completely blocks the user | Flag advertised in help doesn't exist; wrong error message; subcommand crashes | Fix before next release |
+| **UX-improvement** | Confusing or unhelpful; user can work around it | Error message doesn't explain the fix; help text is vague; output is ambiguous | Prioritize for next sprint |
+| **UX-polish** | Minor friction, edge case, or consistency issue | Inconsistent flag ordering; minor output inconsistency; formatting | Batch into a cleanup PR |
+
 ## Files
 
 | File | Purpose |
 |------|---------|
-| [`workflow.md`](workflow.md) | Repeatable process - prerequisites, permissions, launch steps, triage |
+| [`SPEC.md`](SPEC.md) | Formal specification: execution model, invariants, preconditions, correctness guarantees |
+| [`workflow.md`](workflow.md) | Repeatable process — prerequisites, permissions, launch steps, triage |
 | [`sandbox-setup.md`](sandbox-setup.md) | Container design, Dockerfile patterns, docker exec vs bind mount |
 | [`prompts/prompt-template.md`](prompts/prompt-template.md) | Audit prompt template with variable table and audit areas structure |
 | [`prompts/filler-agent-prompt.md`](prompts/filler-agent-prompt.md) | Agent that discovers tool metadata and fills the template |
 | [`prompts/cold-start-audit-skill.md`](prompts/cold-start-audit-skill.md) | Portable Claude Code `/cold-start-audit` skill |
 
-## Severity Tiers
-
-| Tier | Meaning | Action |
-|------|---------|--------|
-| **UX-critical** | Broken, misleading, or blocks the user | Fix before next release |
-| **UX-improvement** | Confusing but functional | Prioritize for next sprint |
-| **UX-polish** | Minor friction or inconsistency | Batch into a cleanup PR |
-
 ## Composing with Scout-and-Wave
 
-Audit findings are structured input for parallel fixes. Once you have a severity-tiered findings report, hand it to the [scout-and-wave](https://github.com/blackwell-systems/scout-and-wave) scout: it runs a pre-implementation check to filter already-fixed items, assigns remaining findings to parallel agents with disjoint file ownership, and executes in waves. The [agentic-workflows](https://github.com/blackwell-systems/agentic-workflows) repo documents this Audit-Fix-Verify loop and links to the reference implementation in [brewprune](https://github.com/blackwell-systems/brewprune) — six complete audit→fix cycles across 118 findings.
+Audit findings are structured input for parallel fixes. Once you have a severity-tiered findings report, hand it to [scout-and-wave](https://github.com/blackwell-systems/scout-and-wave):
+
+```bash
+/saw scout "Fix UX findings from cold-start audit"
+/saw wave
+```
+
+The scout runs a pre-implementation check to filter already-fixed items, assigns remaining findings to parallel agents with disjoint file ownership, and executes in waves. The [agentic-workflows](https://github.com/blackwell-systems/agentic-workflows) repo documents the full Audit→Fix→Verify loop — six complete cycles across 118 findings in [brewprune](https://github.com/blackwell-systems/brewprune).
 
 ## License
 
