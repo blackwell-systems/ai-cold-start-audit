@@ -1,7 +1,7 @@
 # agentic-cold-start-audit
 
 [![Blackwell Systems™](https://raw.githubusercontent.com/blackwell-systems/blackwell-docs-theme/main/badge-trademark.svg)](https://github.com/blackwell-systems)
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
 
 A two-agent protocol for discovering cold-start UX friction in CLI tools. A filler agent reads your project's help output and populates a structured audit prompt. An audit agent executes every subcommand as a simulated new user in a sandboxed environment, producing a severity-tiered findings report with exact reproduction steps. Human review is preserved: the skill waits for your confirmation before launching agents. Includes a Claude Code `/cold-start-audit` skill.
 
@@ -14,6 +14,25 @@ AI agents have zero prior context. They follow the help text, try the obvious co
 The problem is safety. An agent testing your production system can delete data, corrupt state, or trigger side effects. Every audit here runs inside an isolated sandbox — container, redirected env vars, or a fresh directory copy. The audit agent can fail safely, and you see every failure.
 
 The result is a severity-tiered findings report: what's broken, what's confusing, what's rough polish. Some findings are blockers. Others are sprint items. The [`/cold-start-audit report`](#commands) command triages them.
+
+## What's New in v1.1
+
+**Fully automated container lifecycle:**
+- `container build` auto-increments rounds (brewprune-r7 → r8), checks for reusable containers, builds & starts automatically
+- `container list` shows all images/containers with status
+- `container cleanup` removes old rounds, keeps latest N
+- No more manual `docker build` / `docker run` commands
+
+**Prerequisites validation:**
+- `preflight` validates all requirements (tool installed, Docker running, permissions configured)
+- Provides actionable fix steps when checks fail
+- Auto-runs before `setup` and `run` commands
+- No more silent failures from missing permissions
+
+**Enhanced observability:**
+- Custom `filler` and `audit` agent types with structural constraints
+- Separate success rates in claudewatch metrics
+- Graceful fallback to general-purpose agents
 
 ## When to Use It
 
@@ -31,48 +50,99 @@ It is less useful for:
 - **Internal tools with a small team that knows the author** — Training cost exceeds discovery value.
 - **Tools requiring non-reproducible external setup** — APIs, live databases, or third-party accounts that can't be mocked in a sandbox reduce coverage.
 
-## Discovering the Right Sandbox Mode
+## Quickstart
 
-Not sure which isolation mode fits your tool? Ask the skill before anything else:
+### First Time Setup
 
+1. **Discover the right mode:**
 ```bash
 /cold-start-audit mode mytool
 ```
 
-The skill reads your tool's `--help` output and answers three diagnostic questions:
+2. **Create a Dockerfile** (container mode only):
+```dockerfile
+# Dockerfile.sandbox
+FROM golang:1.23 AS builder
+WORKDIR /src
+COPY . .
+RUN go build -o /out/mytool
 
-1. **Does the tool have destructive operations?** (remove, delete, system writes)
-2. **Does the tool write only to self-managed state?** (its own DB, config file, redirectable via env var)
-3. **Does the tool operate on the current directory or file tree?**
+FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y curl git sudo
+RUN useradd -m appuser && echo "appuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+USER appuser
+COPY --from=builder /out/mytool /usr/local/bin/mytool
+CMD ["/bin/bash"]
+```
 
-It emits a mode recommendation with rationale and a ready-to-run command. You don't need to understand the isolation mechanisms to get started — the skill handles the decision.
-
-## Quickstart
-
-After running `mode` to get your command, the full audit workflow is automated:
+3. **Run the audit:**
 
 **Container mode** (destructive ops, package managers, system writes):
-
 ```bash
 /cold-start-audit container build mytool
 /cold-start-audit run mytool --mode container mytool-r1
 ```
 
-**Local mode** (tool writes only to its own DB or config, redirectable via env var):
-
+**Local mode** (tool writes only to its own DB or config):
 ```bash
 /cold-start-audit run mytool --mode local --env MYTOOL_DB=/tmp/audit-$$/db.sqlite3
 ```
 
-**Worktree mode** (tool reads/writes files in the current directory):
-
+**Worktree mode** (tool reads/writes files in current directory):
 ```bash
 /cold-start-audit run mytool --mode worktree --dir /path/to/project
 ```
 
 The report lands in `docs/cold-start-audit.md`.
 
-See [`sandbox-setup.md`](sandbox-setup.md) for Dockerfile patterns, Docker setup, and mode guidance.
+### Subsequent Rounds
+
+After fixing issues from the first audit, running the next round is one command:
+
+```bash
+/cold-start-audit container build mytool  # Auto-detects r1, creates r2
+/cold-start-audit run mytool --mode container mytool-r2
+```
+
+The skill:
+- ✅ Auto-increments round numbers
+- ✅ Checks if container is already running (reuses if so)
+- ✅ Validates all prerequisites before starting
+- ✅ Offers to reuse previous audit prompt (fast) or regenerate (thorough)
+
+### Workflow Comparison
+
+**Before (manual):**
+```bash
+# Figure out next round number manually
+docker images | grep mytool-r
+
+# Build and start container
+docker build -t mytool-r8 -f Dockerfile.sandbox .
+docker run -d --name mytool-r8 --rm mytool-r8 sleep 3600
+
+# Hope permissions are configured correctly
+# (silent failures if not)
+
+# Run audit
+/cold-start-audit run mytool --mode container mytool-r8
+
+# Later: remember to clean up old containers
+docker rm -f mytool-r1 mytool-r2 mytool-r3...
+docker rmi mytool-r1 mytool-r2 mytool-r3...
+```
+
+**After (automated):**
+```bash
+# One command builds & starts with auto-incrementing
+/cold-start-audit container build mytool
+
+# Preflight validates everything, shows fix steps if needed
+/cold-start-audit run mytool --mode container mytool-r8
+
+# One command cleanup
+/cold-start-audit container cleanup mytool --keep-latest 2
+```
 
 ## Commands
 
@@ -84,16 +154,19 @@ See [`sandbox-setup.md`](sandbox-setup.md) for Dockerfile patterns, Docker setup
 /cold-start-audit preflight <tool-name> --mode <mode> [mode-args]
   Validate all prerequisites before running an audit. Checks tool installation,
   permissions, Docker status, and provides actionable fix steps if any fail.
+  Auto-runs before setup and run commands.
 
 /cold-start-audit container build <tool-name> [--dockerfile PATH]
   Auto-increment round number, check for reusable containers, build image, and
   start container. Detects brewprune-r7 → creates brewprune-r8 automatically.
+  Offers to reuse if container already running or image exists.
 
 /cold-start-audit container list <tool-name>
-  Show all images and containers for a tool with their status.
+  Show all images and containers for a tool with their status (running/stopped).
 
 /cold-start-audit container cleanup <tool-name> [--keep-latest N]
   Remove old containers and images, keeping the latest N rounds (default: 2).
+  Prompts for confirmation before deleting anything.
 
 /cold-start-audit setup <tool-name> --mode <mode> [mode-args]
   Run the filler agent only: discover tool metadata and write the filled
@@ -115,12 +188,104 @@ See [`sandbox-setup.md`](sandbox-setup.md) for Dockerfile patterns, Docker setup
 ## How It Works
 
 1. **Choose a sandbox** — container, local env var, or worktree isolation, depending on the tool's blast radius. Run `/cold-start-audit mode <tool-name>` if unsure.
-2. **Validate prerequisites** — preflight checks run automatically before setup/run, ensuring Docker is running, permissions are configured, and tools are installed.
-3. **Filler agent** — runs `--help` on every subcommand, inspects the sandbox environment, and populates the prompt template with real commands and the correct exec prefix.
-4. **Audit agent** — executes the filled prompt inside the sandbox as a new user, noting every output, error, and friction point.
+
+2. **Validate prerequisites** — preflight checks run automatically before setup/run:
+   - Tool installed (`<tool-name> --help` succeeds)
+   - Permissions configured (`~/.claude/settings.json` has Bash allowed)
+   - Docker running (container mode only)
+   - Container exists and running (container mode only)
+   - If any check fails, get actionable fix steps immediately
+
+3. **Filler agent** — runs `--help` on every subcommand, inspects the sandbox environment, and populates the prompt template with real commands and the correct exec prefix. Validates the filled prompt for unfilled placeholders.
+
+4. **Audit agent** — executes the filled prompt inside the sandbox as a new user, noting every output, error, and friction point. Runs with zero knowledge of previous findings.
+
 5. **Structured report** — findings grouped by area with severity tiers and exact reproduction steps.
 
 For subsequent audits, the skill checks for an existing prompt and offers to reuse it (fast — only updates container name and date) or regenerate from scratch (when tool structure changed). Reusing the prompt doesn't change what the agent discovers — it still runs with zero context — it just skips re-reading help text.
+
+## Preflight Validation Example
+
+When running a container mode audit, preflight checks all prerequisites:
+
+```
+✓ Preflight checks (7/7 passed)
+
+  ✓ Tool installed: brewprune --help succeeds
+  ✓ Bash permissions configured in ~/.claude/settings.json
+  ✓ Session restarted since last settings change
+  ✓ No broken hooks found
+  ✓ Docker is running
+  ✓ Container brewprune-r8 exists and is running
+  ✓ Tool installed in container
+
+All prerequisites met. Ready to run audit.
+```
+
+If checks fail, you get actionable fix steps:
+
+```
+✗ Preflight checks failed (5/7 passed)
+
+Failures:
+  ✗ Docker not running
+    Fix: Start Docker Desktop or run: sudo systemctl start docker
+
+  ✗ Container brewprune-r8 not found
+    Fix: /cold-start-audit container build brewprune
+    Or manually: docker run -d --name brewprune-r8 brewprune-r8 sleep 3600
+
+Run these fixes, then retry.
+```
+
+## Container Lifecycle Management
+
+The `container build` command handles the full lifecycle automatically:
+
+1. **Auto-detects round number** by finding highest existing (e.g., brewprune-r7)
+2. **Checks for reusable containers** — if brewprune-r8 is already running, offers to reuse
+3. **Checks for reusable images** — if image exists but container stopped, offers to just start it
+4. **Builds new image** only when needed (source changed since last audit)
+5. **Starts container** with correct name and keeps it running
+
+**Managing multiple rounds:**
+```bash
+/cold-start-audit container list brewprune
+
+Images for brewprune:
+REPOSITORY      TAG     SIZE    CREATED
+brewprune-r6    latest  155MB   5 days ago
+brewprune-r7    latest  156MB   2 days ago
+brewprune-r8    latest  157MB   3 hours ago
+
+Containers for brewprune:
+NAMES           STATUS                  IMAGE
+brewprune-r6    Exited (0) 5 days ago   brewprune-r6
+brewprune-r7    Exited (0) 2 days ago   brewprune-r7
+brewprune-r8    Up 3 hours              brewprune-r8
+```
+
+**Cleanup old rounds:**
+```bash
+/cold-start-audit container cleanup brewprune --keep-latest 2
+
+Found 8 rounds. Keeping latest 2 (r7, r8).
+
+Rounds to remove:
+  - brewprune-r1
+  - brewprune-r2
+  - brewprune-r3
+  - brewprune-r4
+  - brewprune-r5
+  - brewprune-r6
+
+Continue? [y/N]: y
+
+✓ Removed container: brewprune-r1
+✓ Removed image: brewprune-r1
+...
+✓ Cleanup complete
+```
 
 ## Installation
 
