@@ -41,20 +41,17 @@ It is less useful for:
 ```
 
 2. **Create a Dockerfile** (container mode only):
-```dockerfile
-# Dockerfile.sandbox
-FROM golang:1.23 AS builder
-WORKDIR /src
-COPY . .
-RUN go build -o /out/mytool
 
-FROM ubuntu:22.04
-RUN apt-get update && apt-get install -y curl git sudo
-RUN useradd -m appuser && echo "appuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
-USER appuser
-COPY --from=builder /out/mytool /usr/local/bin/mytool
-CMD ["/bin/bash"]
-```
+Container mode expects `Dockerfile.sandbox` by convention. You have three options:
+
+- **Generate automatically** with [dockerfile-sandbox-gen](https://github.com/blackwell-systems/dockerfile-sandbox-gen):
+  ```bash
+  /dockerfile-sandbox-gen mytool
+  ```
+
+- **Write manually** at `Dockerfile.sandbox` in your project root
+
+- **Use custom path** with `--dockerfile PATH` when building the container
 
 3. **Run the audit:**
 
