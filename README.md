@@ -5,6 +5,45 @@
 
 A two-agent protocol for discovering cold-start UX friction in CLI tools. A filler agent reads your project's help output and populates a structured audit prompt. An audit agent executes every subcommand as a simulated new user in a sandboxed environment, producing a severity-tiered findings report with exact reproduction steps. Human review is preserved: the skill waits for your confirmation before launching agents. Includes a Claude Code `/cold-start-audit` skill.
 
+## Installation
+
+### Prerequisites
+- [Claude Code](https://code.anthropic.com) (CLI or IDE extension)
+- Docker (for container mode only - skip if using local/worktree modes)
+
+### Install the Skill
+```bash
+# Copy skill to Claude Code skills directory
+mkdir -p ~/.claude/skills
+cp prompts/cold-start-audit-skill.md ~/.claude/skills/
+
+# Restart Claude Code (skills load at session start)
+# Verify: Type /cold-start-audit and see the skill appear
+```
+
+### Optional: Install Custom Agent Types
+For enhanced observability and tool enforcement:
+```bash
+mkdir -p ~/.claude/agents
+ln -sf $(pwd)/prompts/agents/filler.md ~/.claude/agents/filler.md
+ln -sf $(pwd)/prompts/agents/audit.md ~/.claude/agents/audit.md
+# Then restart Claude Code
+```
+
+## Core Concepts
+
+**Cold-Start Audit:** Simulating a brand-new user who has never seen your tool, following only help text, and reporting every friction point encountered.
+
+**Two-Agent Pattern:**
+1. **Filler Agent** - Reads `--help` output from your tool, discovers subcommands/flags, and generates a customized audit prompt with exact commands to test. Runs once per audit round (or reuse previous).
+2. **Audit Agent** - Executes the filled prompt in a fresh session with zero knowledge, runs 30+ commands in sandbox, reports findings. This is the "new user" simulation.
+
+**Why two agents?** The audit agent MUST have zero context (simulating a new user). If it read help text itself, it would know what to expect. The filler agent handles the "setup" knowledge separately.
+
+**Sandbox Isolation:** All commands run through an isolation layer (Docker container, env vars, or temp directory copy) so destructive operations are safe.
+
+**Pure Discovery:** The audit agent has no memory of previous rounds. It discovers friction organically, not from a checklist.
+
 ## Why
 
 You can't UX-test your own tool — you know too much. Every mental model you've built, every shortcut you've learned, every implicit assumption about how the tool is used shapes your testing. You'll test the paths that work. You won't test the ones you never tried.
@@ -31,6 +70,24 @@ It is less useful for:
 - **Internal tools with a small team that knows the author** — Training cost exceeds discovery value.
 - **Tools requiring non-reproducible external setup** — APIs, live databases, or third-party accounts that can't be mocked in a sandbox reduce coverage.
 
+## Choosing a Sandbox Mode
+
+Not sure which mode to use? Run:
+```bash
+/cold-start-audit mode mytool
+```
+
+This analyzes your tool's `--help` output and asks:
+1. **Q1:** Does the tool have destructive operations? (remove, delete, uninstall, etc.)
+   → If yes: **container mode** (strongest isolation)
+2. **Q2:** Does it write to self-managed state? (databases, config files it manages)
+   → If yes, check Q3
+3. **Q3:** Can state be redirected via environment variables?
+   → If yes: **local mode** (env var redirection)
+   → If no: **container mode**
+
+If the tool only operates on files in the current directory: **worktree mode** (temp directory copy)
+
 ## Quickstart
 
 ### First Time Setup
@@ -42,7 +99,12 @@ It is less useful for:
 
 2. **Create a Dockerfile** (container mode only):
 
-Container mode expects `Dockerfile.sandbox` by convention. You have three options:
+Container mode requires an **audit-ready Dockerfile** (not your production Dockerfile). This special Dockerfile:
+- Installs the tool at `/usr/local/bin/<tool-name>`
+- Creates a non-root user with sudo access
+- Simulates a realistic user environment
+
+You have three options:
 
 - **Generate automatically** with [dockerfile-sandbox-gen](https://github.com/blackwell-systems/dockerfile-sandbox-gen):
   ```bash
@@ -53,11 +115,18 @@ Container mode expects `Dockerfile.sandbox` by convention. You have three option
 
 - **Use custom path** with `--dockerfile PATH` when building the container
 
+See [sandbox-setup.md](docs/sandbox-setup.md#dockerfile-pattern) for the full Dockerfile contract requirements.
+
 3. **Run the audit:**
 
 **Container mode** (destructive ops, package managers, system writes):
 ```bash
+# Step 1: Build a Docker container with your tool installed
+# This auto-names the container "mytool-r1" (round 1)
 /cold-start-audit container build mytool
+
+# Step 2: Run the full audit using that container
+# The agent will execute 30+ commands inside mytool-r1 and write findings
 /cold-start-audit run mytool --mode container mytool-r1
 ```
 
@@ -72,6 +141,19 @@ Container mode expects `Dockerfile.sandbox` by convention. You have three option
 ```
 
 The report lands in `docs/cold-start-audit.md`.
+
+### Verify Your First Audit
+
+After running `/cold-start-audit run`:
+
+1. **Check agent output** - You'll see the filler agent discover subcommands, then the audit agent launch in background
+2. **Monitor progress** - Look for "Running command X/30..." style output
+3. **Expected duration** - 5-10 minutes for typical CLI tool with 5-10 subcommands
+4. **Check results** - `ls docs/` should show:
+   - `cold-start-audit-prompt.md` - The filled audit prompt
+   - `cold-start-audit.md` - The findings report with severity tiers
+
+**If files exist but are empty:** Check permissions (see [Permissions](#permissions) section).
 
 ### Subsequent Rounds
 
@@ -289,11 +371,12 @@ After installation, restart your Claude Code session (settings are not hot-reloa
 
 ## Permissions
 
-Background agents cannot prompt for tool approval. Without an explicit `allow` rule, every `Bash` call is denied and the agent silently fails.
+**Symptom:** Agents launch but produce no output, or audit completes with empty files.
+**Cause:** Background agents (agents that run without blocking your session) need explicit permission to use Bash, Read, and Write tools.
 
-### User-level (one-time setup)
+### Quick Fix (Recommended)
 
-Add to `~/.claude/settings.json`:
+Add to `~/.claude/settings.json` (in your home directory):
 
 ```json
 {
@@ -303,11 +386,13 @@ Add to `~/.claude/settings.json`:
 }
 ```
 
-> **Common mistake:** `allow_bash: true` is not a valid Claude Code permission format and is silently ignored.
+Then **restart Claude Code** (settings load at session start, not hot-reloaded).
 
-After editing, restart your Claude Code session. Settings are not hot-reloaded.
+To verify: Try `/cold-start-audit preflight <tool>` - it will check permissions.
 
-### Project-level (optional, scoped)
+> **Common mistake:** `allow_bash: true` is invalid syntax and silently ignored. Use `"allow": ["Bash"]` instead.
+
+### Advanced: Project-Level Scoped Permissions
 
 For tighter control, add `.claude/settings.json` to the project repo:
 
