@@ -49,14 +49,13 @@ It emits a mode recommendation with rationale and a ready-to-run command. You do
 
 ## Quickstart
 
-After running `mode` to get your command, the full audit is one line:
+After running `mode` to get your command, the full audit workflow is automated:
 
 **Container mode** (destructive ops, package managers, system writes):
 
 ```bash
-docker build -t my-tool-sandbox -f Dockerfile.sandbox .
-docker run -d --name my-sandbox --rm my-tool-sandbox sleep 3600
-/cold-start-audit run mytool --mode container my-sandbox
+/cold-start-audit container build mytool
+/cold-start-audit run mytool --mode container mytool-r1
 ```
 
 **Local mode** (tool writes only to its own DB or config, redirectable via env var):
@@ -82,28 +81,44 @@ See [`sandbox-setup.md`](sandbox-setup.md) for Dockerfile patterns, Docker setup
   Recommend a sandbox isolation mode. Reads --help output and answers
   three diagnostic questions. Does not write any files.
 
+/cold-start-audit preflight <tool-name> --mode <mode> [mode-args]
+  Validate all prerequisites before running an audit. Checks tool installation,
+  permissions, Docker status, and provides actionable fix steps if any fail.
+
+/cold-start-audit container build <tool-name> [--dockerfile PATH]
+  Auto-increment round number, check for reusable containers, build image, and
+  start container. Detects brewprune-r7 → creates brewprune-r8 automatically.
+
+/cold-start-audit container list <tool-name>
+  Show all images and containers for a tool with their status.
+
+/cold-start-audit container cleanup <tool-name> [--keep-latest N]
+  Remove old containers and images, keeping the latest N rounds (default: 2).
+
 /cold-start-audit setup <tool-name> --mode <mode> [mode-args]
   Run the filler agent only: discover tool metadata and write the filled
   audit prompt to docs/cold-start-audit-prompt.md. Use when you want to
   review the prompt before running the full audit.
 
 /cold-start-audit run <tool-name> --mode <mode> [mode-args]
-  Run the full audit (filler + audit agent). Checks for an existing prompt
-  and offers to reuse or regenerate. Writes findings to docs/cold-start-audit.md.
+  Run the full audit (filler + audit agent). Automatically runs preflight checks.
+  Checks for existing prompt and offers to reuse or regenerate. Writes findings
+  to docs/cold-start-audit.md.
 
 /cold-start-audit report
   Read and summarize the findings from docs/cold-start-audit.md, grouped by severity.
 
 /cold-start-audit init <container-name>
-  Scaffold .claude/settings.json with scoped Bash permissions for a named container.
+  Scaffold .claude/settings.json with scoped permissions for a named container.
 ```
 
 ## How It Works
 
 1. **Choose a sandbox** — container, local env var, or worktree isolation, depending on the tool's blast radius. Run `/cold-start-audit mode <tool-name>` if unsure.
-2. **Filler agent** — runs `--help` on every subcommand, inspects the sandbox environment, and populates the prompt template with real commands and the correct exec prefix.
-3. **Audit agent** — executes the filled prompt inside the sandbox as a new user, noting every output, error, and friction point.
-4. **Structured report** — findings grouped by area with severity tiers and exact reproduction steps.
+2. **Validate prerequisites** — preflight checks run automatically before setup/run, ensuring Docker is running, permissions are configured, and tools are installed.
+3. **Filler agent** — runs `--help` on every subcommand, inspects the sandbox environment, and populates the prompt template with real commands and the correct exec prefix.
+4. **Audit agent** — executes the filled prompt inside the sandbox as a new user, noting every output, error, and friction point.
+5. **Structured report** — findings grouped by area with severity tiers and exact reproduction steps.
 
 For subsequent audits, the skill checks for an existing prompt and offers to reuse it (fast — only updates container name and date) or regenerate from scratch (when tool structure changed). Reusing the prompt doesn't change what the agent discovers — it still runs with zero context — it just skips re-reading help text.
 
