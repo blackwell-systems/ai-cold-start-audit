@@ -86,10 +86,10 @@ After fixing issues from the first audit, running the next round is one command:
 ```
 
 The skill:
-- ✅ Auto-increments round numbers
-- ✅ Checks if container is already running (reuses if so)
-- ✅ Validates all prerequisites before starting
-- ✅ Offers to reuse previous audit prompt (fast) or regenerate (thorough)
+- Auto-increments round numbers
+- Checks if container is already running (reuses if so)
+- Validates all prerequisites before starting
+- Offers to reuse previous audit prompt (fast) or regenerate (thorough)
 
 ### Workflow Comparison
 
