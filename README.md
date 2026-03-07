@@ -2,8 +2,11 @@
 
 [![Blackwell Systems™](https://raw.githubusercontent.com/blackwell-systems/blackwell-docs-theme/main/badge-trademark.svg)](https://github.com/blackwell-systems)
 ![Version](https://img.shields.io/badge/version-1.1.0-blue)
+[![Agent Skills](badge-agentskills.svg)](https://agentskills.io)
 
 A two-agent protocol for discovering cold-start UX friction in CLI tools. A filler agent reads your project's help output and populates a structured audit prompt. An audit agent executes every subcommand as a simulated new user in a sandboxed environment, producing a severity-tiered findings report with exact reproduction steps. Human review is preserved: the skill waits for your confirmation before launching agents. Includes a Claude Code `/cold-start-audit` skill.
+
+Follows the [Agent Skills](https://agentskills.io) open standard — compatible with Claude Code, Cursor, GitHub Copilot, and other Agent Skills-compatible tools.
 
 ## Installation
 
