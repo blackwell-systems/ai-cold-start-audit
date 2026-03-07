@@ -15,7 +15,7 @@ A two-agent protocol for discovering cold-start UX friction in CLI tools. A fill
 ```bash
 # Copy skill to Claude Code skills directory
 mkdir -p ~/.claude/skills
-cp prompts/cold-start-audit-skill.md ~/.claude/skills/
+cp -r prompts/cold-start-audit-skill ~/.claude/skills/cold-start-audit
 
 # Restart Claude Code (skills load at session start)
 # Verify: Type /cold-start-audit and see the skill appear
@@ -447,7 +447,7 @@ Sample finding:
 | [`sandbox-setup.md`](sandbox-setup.md) | Container design, Dockerfile patterns, docker exec vs bind mount |
 | [`prompts/prompt-template.md`](prompts/prompt-template.md) | Audit prompt template with variable table and audit areas structure |
 | [`prompts/filler-agent-prompt.md`](prompts/filler-agent-prompt.md) | Agent that discovers tool metadata and fills the template |
-| [`prompts/cold-start-audit-skill.md`](prompts/cold-start-audit-skill.md) | Portable Claude Code `/cold-start-audit` skill |
+| [`prompts/cold-start-audit-skill/`](prompts/cold-start-audit-skill/SKILL.md) | Portable Claude Code `/cold-start-audit` skill |
 
 ## Composing with Scout-and-Wave
 

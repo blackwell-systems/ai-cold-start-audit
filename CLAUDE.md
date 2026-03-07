@@ -93,7 +93,7 @@ Correct sequencing: filler completes → read filled prompt → launch audit age
 prompts/
   prompt-template.md       — Generalized audit prompt with variable table
   filler-agent-prompt.md   — Agent that discovers metadata and fills template
-  cold-start-audit-skill.md — Portable Claude Code skill (users install to ~/.claude/skills/)
+  cold-start-audit-skill/   — Portable Claude Code skill directory (users install to ~/.claude/skills/cold-start-audit)
 
 docs/                      — Generated reports land here:
   cold-start-audit-prompt.md  (filled by filler agent)
@@ -144,7 +144,7 @@ Project-level `.claude/settings.json` can scope Bash to specific containers: `"B
 
 ## Skill Commands
 
-The `/cold-start-audit` skill (in `prompts/cold-start-audit-skill.md`) provides:
+The `/cold-start-audit` skill (in `prompts/cold-start-audit-skill/SKILL.md`) provides:
 
 - `mode <tool-name>` — Recommend isolation mode via Q1-Q3 diagnostic
 - `setup <tool-name> --mode <mode> [args]` — Run filler agent only

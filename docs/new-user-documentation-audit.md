@@ -26,7 +26,7 @@ The documentation is comprehensive and well-structured but has **significant onb
 
 **What's missing:**
 - How to install the `/cold-start-audit` skill itself
-- Where to put `prompts/cold-start-audit-skill.md`
+- Where to put `prompts/cold-start-audit-skill/` (it's now a directory, not a single file)
 - Prerequisite: Claude Code must be installed
 - Prerequisite: Docker required for container mode
 - User-level vs. custom agent types installation distinction
@@ -43,7 +43,7 @@ The documentation is comprehensive and well-structured but has **significant onb
 1. Copy the skill to your Claude Code skills directory:
    ```bash
    mkdir -p ~/.claude/skills
-   cp prompts/cold-start-audit-skill.md ~/.claude/skills/
+   cp -r prompts/cold-start-audit-skill ~/.claude/skills/cold-start-audit
    ```
 2. Restart Claude Code (skills are loaded at session start)
 3. Verify installation: type `/cold-start-audit` and see the skill appear
@@ -636,7 +636,7 @@ After reading all documentation:
 
    Want to see it in action before learning details?
 
-   1. Install skill: `cp prompts/cold-start-audit-skill.md ~/.claude/skills/`
+   1. Install skill: `cp -r prompts/cold-start-audit-skill ~/.claude/skills/cold-start-audit`
    2. Set permissions: Add `"allow": ["Bash", "Read", "Write"]` to `~/.claude/settings.json`
    3. Restart Claude Code
    4. Run: `/cold-start-audit mode yourTool` (analyzes and recommends mode)
